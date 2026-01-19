@@ -1,60 +1,69 @@
 import streamlit as st
 import google.generativeai as genai
 from PIL import Image
-import os
 
-# 1. Setup Gemini API using Streamlit Secrets
+# 1. Setup API
 if "GOOGLE_API_KEY" in st.secrets:
     genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
 else:
-    st.error("API Key missing! Add GOOGLE_API_KEY to your Streamlit Secrets.")
+    st.error("API Key missing!")
 
-# Using the stable 2026 model
 model = genai.GenerativeModel('gemini-3-flash-preview')
 
-st.set_page_config(page_title="ICT Trade Journal & Fakeout Detector", layout="wide")
+st.set_page_config(page_title="ICT Trade Coach", layout="wide")
+st.title("📊 ICT Trade Journal & Interactive Coach")
 
-st.title("📊 ICT Trade Journal: Fakeout Detector")
-st.write("Upload your NQ/GC screenshot to analyze if a move is a high-probability setup or a trap.")
+# 2. Initialize Chat History in Session State
+if "chat_history" not in st.session_state:
+    st.session_state.chat_history = []
+if "analysis_done" not in st.session_state:
+    st.session_state.analysis_done = False
 
-# 2. Sidebar for Trade Metadata
+# Sidebar
 with st.sidebar:
-    st.header("Trade Log")
-    instrument = st.selectbox("Instrument", ["NQ (Nasdaq)", "GC (Gold)", "ES (S&P 500)"])
-    session = st.radio("Session", ["AM Silver Bullet (10-11am)", "PM Silver Bullet (2-3pm)", "London"])
-    user_notes = st.text_area("Your initial thoughts on this trade:")
+    st.header("Trade Metadata")
+    instrument = st.selectbox("Instrument", ["NQ", "GC", "ES"])
+    session = st.radio("Session", ["AM Silver Bullet", "PM Silver Bullet", "London"])
+    if st.button("Clear Chat History"):
+        st.session_state.chat_history = []
+        st.session_state.analysis_done = False
 
-# 3. Image Upload
-uploaded_file = st.file_uploader("Drop your chart screenshot here...", type=["png", "jpg", "jpeg"])
+# 3. Main Analysis Section
+uploaded_file = st.file_uploader("Upload chart screenshot...", type=["png", "jpg", "jpeg"])
 
 if uploaded_file:
     img = Image.open(uploaded_file)
-    st.image(img, caption="Analyzing this setup...", use_container_width=True)
+    st.image(img, use_container_width=True)
     
-    if st.button("Run Fakeout Analysis"):
-        with st.spinner("Scanning for Smart Money signatures..."):
-            # The Updated "Fakeout-Aware" Prompt
-            prompt = f"""
-            Act as an elite ICT (Inner Circle Trader) mentor. Analyze this {instrument} chart during the {session}.
-            
-            Focus specifically on identifying 'Fake Outs' vs. 'Valid Entries':
-            
-            1. LIQUIDITY ANALYSIS: Was there a clear sweep of Sell-Side or Buy-Side liquidity BEFORE the MSS? 
-               (If no sweep occurred, flag this as a potential low-probability 'inducement' move).
-            2. DISPLACEMENT CHECK: Did the Market Structure Shift (MSS) happen with energetic, full-bodied candles? 
-               (If the break was made only by wicks or small, hesitant candles, identify it as a Fake Out).
-            3. UNICORN VALIDATION: Look for a Breaker Block overlapping a Fair Value Gap (FVG). 
-               Did the price respect the FVG, or did it slice through it immediately (Inversion)?
-            
-            FINAL VERDICT:
-            - Provide a Grade (A, B, or C).
-            - Explicitly state: "VALID SETUP" or "POTENTIAL FAKEOUT".
-            - Explain WHY the first MSS on the chart might have failed if it was a trap.
-            """
-            
+    if st.button("Analyze Setup"):
+        with st.spinner("Analyzing..."):
+            prompt = f"Act as an ICT mentor. Analyze this {instrument} {session} setup for liquidity sweeps, MSS, and Unicorn models. Flag any fakeouts."
             response = model.generate_content([prompt, img])
             
-            st.subheader("🕵️ AI Strategy Breakdown")
+            # Save the initial analysis to history
+            st.session_state.chat_history.append({"role": "assistant", "content": response.text})
+            st.session_state.analysis_done = True
+
+# 4. Follow-up Chat UI
+if st.session_state.analysis_done:
+    st.divider()
+    st.subheader("💬 Chat with your ICT Coach")
+    
+    # Display previous messages
+    for message in st.session_state.chat_history:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
+
+    # User input for follow-ups
+    if prompt := st.chat_input("Ask a follow-up about this trade..."):
+        with st.chat_message("user"):
+            st.markdown(prompt)
+        st.session_state.chat_history.append({"role": "user", "content": prompt})
+        
+        # Get AI response based on full history + the image
+        with st.chat_message("assistant"):
+            # We send the image again so the AI can "see" what you're asking about
+            full_context = f"Based on the chart provided and our previous discussion: {prompt}"
+            response = model.generate_content([full_context, img])
             st.markdown(response.text)
-            
-            st.info("Tip: If the AI mentions 'Turtle Soup,' it means a liquidity grab occurred without a real trend change.")
+            st.session_state.chat_history.append({"role": "assistant", "content": response.text})
