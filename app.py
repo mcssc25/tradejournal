@@ -10,7 +10,7 @@ if "GOOGLE_API_KEY" in st.secrets:
 else:
     st.error("Please add your GOOGLE_API_KEY to Streamlit Secrets.")
 
-model = genai.GenerativeModel('gemini-1.5-pro')
+model = genai.GenerativeModel('gemini-1.5-flash')
 
 st.set_page_config(page_title="ICT Trade Journal", layout="wide")
 
