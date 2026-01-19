@@ -10,7 +10,7 @@ else:
     st.error("API Key missing! Add GOOGLE_API_KEY to your Streamlit Secrets.")
 
 # Using the stable 2026 model
-model = genai.GenerativeModel('gemini-1.5-pro') 
+model = genai.GenerativeModel('gemini-3-flash-preview')
 
 st.set_page_config(page_title="ICT Trade Journal & Fakeout Detector", layout="wide")
 
